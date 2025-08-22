@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Form</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      width: 90%;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+    .branch {
+      display: none;
+    }
+    .branch.active {
+      display: block;
+    }
+    .product {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 8px;
+      background: #2a2a2a;
+      border-radius: 8px;
+    }
+    .product span {
+      font-weight: bold;
+      color: #e0e0e0;
+    }
+    input[type="number"] {
+      width: 80px;
+      padding: 6px;
+      border-radius: 6px;
+      border: none;
+      text-align: center;
+      background: #121212;
+      color: #fff;
+    }
+    button {
+      padding: 12px 24px;
+      margin: 10px 5px 0 5px;
+      background: #333333;
+      border: none;
+      border-radius: 10px;
+      color: #ffffff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #555555;
+    }
+    .buttons {
+      text-align: center;
+    }
+    h3 {
+      text-align: center;
+      margin-bottom: 15px;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Delivery Form</h2>
+    <div id="branches-container"></div>
+    <div class="buttons">
+      <button onclick="prevBranch()">Previous</button>
+      <button onclick="nextBranch()">Next</button>
+      <button onclick="submitData()">Submit</button>
+    </div>
+  </div>
+
+  <script>
+    let branches = [];
+    let currentBranchIndex = 0;
+
+    // Read data from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataParam = urlParams.get('data');
+    if (dataParam) {
+      try {
+        const webappData = JSON.parse(decodeURIComponent(dataParam));
+        branches = webappData.branches || [];
+        window.deliveryData = webappData.delivery || {};
+      } catch (e) {
+        console.error("Failed to parse WebApp data:", e);
+      }
+    }
+
+    const container = document.getElementById("branches-container");
+
+    function renderBranch(index){
+      container.innerHTML = "";
+      const branch = branches[index];
+      const div = document.createElement("div");
+      div.className = "branch active";
+      div.innerHTML = `<h3>${branch.branchname}</h3>`;
+      branch.products.forEach(p => {
+        const pDiv = document.createElement("div");
+        pDiv.className = "product";
+        pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft})</span>
+                          <input type="number" min="0"
+                          data-productid="${p.productid}" data-productname="${p.productname}">`;
+        div.appendChild(pDiv);
+      });
+      container.appendChild(div);
+    }
+
+    function prevBranch(){
+      if(currentBranchIndex > 0){
+        currentBranchIndex--;
+        renderBranch(currentBranchIndex);
+      }
+    }
+
+    function nextBranch(){
+      if(currentBranchIndex < branches.length -1){
+        currentBranchIndex++;
+        renderBranch(currentBranchIndex);
+      }
+    }
+
+    function submitData(){
+      // Collect quantities
+      const inputs = container.querySelectorAll(".branch input");
+      inputs.forEach(input => {
+        branches.forEach(branch => {
+          branch.products.forEach(p => {
+            if(p.productid == input.dataset.productid){
+              p.quantity = parseInt(input.value) || 0;
+            }
+          });
+        });
+      });
+
+      // Send to Telegram bot
+      if(window.Telegram && window.Telegram.WebApp){
+        window.Telegram.WebApp.sendData(JSON.stringify({
+          delivery: window.deliveryData,
+          branches: branches
+        }));
+        alert("✅ Data sent to the bot!");
+      } else {
+        alert("⚠️ Telegram WebApp not available.");
+      }
+    }
+
+    renderBranch(currentBranchIndex);
+  </script>
+</body>
+</html>
