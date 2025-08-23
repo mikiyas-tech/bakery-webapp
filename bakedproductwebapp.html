@@ -65,8 +65,9 @@
 <body>
     <h2>Baked Products Entry</h2>
     <form id="bakeForm"></form>
-    <button onclick="submitData()">Submit</button>
+    <button type="button" onclick="submitData()">Submit</button>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const data = JSON.parse(decodeURIComponent(urlParams.get('data') || '{}'));
@@ -87,26 +88,36 @@
         }
 
         function submitData() {
-            const result = [];
-            data.products.forEach(product => {
-                const qty = parseInt(document.getElementById(`prod_${product.productid}`).value || 0);
-                if (qty > 0) {
-                    result.push({
-                        productid: product.productid,
-                        productname: product.productname,
-                        quantity: qty
-                    });
-                }
-            });
+            try {
+                const result = [];
+                data.products.forEach(product => {
+                    const qty = parseInt(document.getElementById(`prod_${product.productid}`).value || 0);
+                    if (qty > 0) {
+                        result.push({
+                            productid: product.productid,
+                            productname: product.productname,
+                            quantity: qty
+                        });
+                    }
+                });
 
-            if (window.Telegram.WebApp) {
-                Telegram.WebApp.sendData(JSON.stringify({products: result}));
-                alert("✅ Baked products data sent!");
-            } else {
-                alert("⚠️ This app should be opened via Telegram WebApp.");
+                if (result.length === 0) {
+                    alert("⚠️ No quantities entered!");
+                    return;
+                }
+
+                if (window.Telegram && Telegram.WebApp) {
+                    alert("📤 Sending data...");
+                    Telegram.WebApp.sendData(JSON.stringify({ products: result }));
+                    alert("✅ Baked products data sent!");
+                } else {
+                    alert("⚠️ This app should be opened via Telegram WebApp.");
+                }
+            } catch (err) {
+                alert("❌ Error: " + err.message);
+                console.error(err);
             }
         }
     </script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </body>
 </html>
