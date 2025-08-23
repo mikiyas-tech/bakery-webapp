@@ -78,8 +78,8 @@
                 const div = document.createElement('div');
                 div.classList.add('product');
                 div.innerHTML = `
-                    <label>${product.productname} (Available: ${product.totalleft})</label>
-                    <input type="number" min="0" max="${product.totalleft}" value="0" id="prod_${product.productid}">
+                    <label>${product.productname} (Available: ${product.totalleft ?? 0})</label>
+                    <input type="number" min="0" max="${product.totalleft ?? 0}" value="0" id="prod_${product.productid}">
                 `;
                 form.appendChild(div);
             });
@@ -91,12 +91,17 @@
             try {
                 const result = [];
                 data.products.forEach(product => {
-                    const qty = parseInt(document.getElementById(`prod_${product.productid}`).value || 0);
+                    const qtyInput = document.getElementById(`prod_${product.productid}`);
+                    const qty = parseInt(qtyInput?.value || 0);
+
                     if (qty > 0) {
                         result.push({
-                            productid: product.productid,
-                            productname: product.productname,
-                            quantity: qty
+                            productid: product.productid ?? 0,
+                            productname: product.productname ?? "",
+                            quantity: qty,
+                            productsusedforbakery: product.productsusedforbakery ?? "",
+                            oneproductvalue: product.oneproductvalue ?? 0.0,
+                            moneyusedtobaketheproduct: product.moneyusedtobaketheproduct ?? 0.0
                         });
                     }
                 });
@@ -106,9 +111,11 @@
                     return;
                 }
 
+                const payload = JSON.stringify({ products: result });
+                console.log("Payload to send:", payload);
+
                 if (window.Telegram && Telegram.WebApp) {
-                    alert("📤 Sending data...");
-                    Telegram.WebApp.sendData(JSON.stringify({ products: result }));
+                    Telegram.WebApp.sendData(payload);
                     alert("✅ Baked products data sent!");
                 } else {
                     alert("⚠️ This app should be opened via Telegram WebApp.");
