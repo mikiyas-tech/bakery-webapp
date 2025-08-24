@@ -60,6 +60,12 @@
             max-width: 480px;
             margin: 0 auto;
         }
+        .status {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .status.success { color: #00ff00; }
+        .status.error { color: #ff4c4c; }
     </style>
 </head>
 <body>
@@ -80,6 +86,7 @@
                 div.innerHTML = `
                     <label>${product.productname}</label>
                     <input type="number" min="0" value="0" id="prod_${product.productid}">
+                    <div class="status" id="status_${product.productid}"></div>
                 `;
                 form.appendChild(div);
             });
@@ -115,8 +122,17 @@
                 console.log("Payload to send:", payload);
 
                 if (window.Telegram && Telegram.WebApp) {
+                    // Send data to Telegram bot
                     Telegram.WebApp.sendData(payload);
-                    alert("✅ Baked products data sent!");
+
+                    // Show a "sending..." status
+                    result.forEach(product => {
+                        const statusDiv = document.getElementById(`status_${product.productid}`);
+                        if (statusDiv) statusDiv.textContent = "⏳ Sending...";
+                    });
+
+                    // Listen for response from Telegram bot (user must manually check Telegram message)
+                    alert("✅ Data sent! Bot will reply in Telegram with success/failure per product.");
                 } else {
                     alert("⚠️ This app should be opened via Telegram WebApp.");
                 }
