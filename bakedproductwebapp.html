@@ -75,72 +75,38 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const data = JSON.parse(decodeURIComponent(urlParams.get('data') || '{}'));
-        const form = document.getElementById('bakeForm');
-
-        if (data.products && Array.isArray(data.products)) {
-            data.products.forEach(product => {
-                const div = document.createElement('div');
-                div.classList.add('product');
-                div.innerHTML = `
-                    <label>${product.productname}</label>
-                    <input type="number" min="0" value="0" id="prod_${product.productid}">
-                    <div class="status" id="status_${product.productid}"></div>
-                `;
-                form.appendChild(div);
-            });
-        } else {
-            form.innerHTML = "<p style='text-align:center;'>No products available</p>";
-        }
-
-        function submitData() {
+        // Assume "tg" is your Telegram WebApp object
+        const tg = window.Telegram.WebApp;
+    
+        async function submitData(data) {
             try {
-                const result = [];
-                data.products.forEach(product => {
-                    const qtyInput = document.getElementById(`prod_${product.productid}`);
-                    const qty = parseInt(qtyInput?.value || 0);
-
-                    if (qty > 0) {
-                        result.push({
-                            productid: product.productid ?? 0,
-                            productname: product.productname ?? "",
-                            quantity: qty,
-                            productsusedforbakery: product.productsusedforbakery ?? "",
-                            oneproductvalue: product.oneproductvalue ?? 0.0,
-                            moneyusedtobaketheproduct: product.moneyusedtobaketheproduct ?? 0.0
+                // Send data to Telegram bot
+                tg.sendData(JSON.stringify(data));
+    
+                // Wait for bot reply through WebAppQueryResult
+                tg.onEvent("web_app_close", () => {
+                    console.log("WebApp closed");
+                });
+    
+                tg.onEvent("web_app_result", (event) => {
+                    try {
+                        let result = JSON.parse(event.result);
+                        let msg = "📋 Results:\n";
+                        result.forEach(r => {
+                            msg += `${r.productname} → ${r.status}\n`;
                         });
+                        alert(msg); // Show detailed result
+                    } catch (e) {
+                        alert("⚠️ Error parsing result: " + e.message);
                     }
                 });
-
-                if (result.length === 0) {
-                    alert("⚠️ No quantities entered!");
-                    return;
-                }
-
-                const payload = JSON.stringify({ products: result });
-                console.log("Payload to send:", payload);
-
-                if (window.Telegram && Telegram.WebApp) {
-                    // Send data to Telegram bot
-                    Telegram.WebApp.sendData(payload);
-
-                    // Show a "sending..." status
-                    result.forEach(product => {
-                        const statusDiv = document.getElementById(`status_${product.productid}`);
-                        if (statusDiv) statusDiv.textContent = "⏳ Sending...";
-                    });
-
-                    // Listen for response from Telegram bot (user must manually check Telegram message)
-                    alert("✅ Data sent! Bot will reply in Telegram with success/failure per product.");
-                } else {
-                    alert("⚠️ This app should be opened via Telegram WebApp.");
-                }
+    
+                alert("⏳ Sending data… please wait for results.");
             } catch (err) {
                 alert("❌ Error: " + err.message);
-                console.error(err);
             }
         }
     </script>
+    
 </body>
 </html>
