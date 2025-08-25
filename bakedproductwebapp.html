@@ -117,7 +117,7 @@
       }
 
       try {
-        tg.sendData(JSON.stringify(payload));
+        tg.sendData(JSON.stringify({ ping: 1 }));
         alert("✅ Data sent to the bot!");
         if (tg.close) tg.close();
       } catch (e) {
@@ -127,3 +127,4 @@
   </script>
 </body>
 </html>
+
