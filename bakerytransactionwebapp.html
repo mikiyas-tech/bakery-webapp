@@ -89,7 +89,10 @@
     </div>
   </div>
 
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
     let branches = [];
     let currentBranchIndex = 0;
 
@@ -152,13 +155,20 @@
         });
       });
 
+      const hasAny = branches.some(b => (b.products || []).some(p => (p.quantity || 0) > 0));
+      if(!hasAny){
+        alert("⚠️ Please enter at least one non-zero quantity.");
+        return;
+      }
+
       // Send to Telegram bot
-      if(window.Telegram && window.Telegram.WebApp){
-        window.Telegram.WebApp.sendData(JSON.stringify({
+      if(tg){
+        tg.sendData(JSON.stringify({
           delivery: window.deliveryData,
           branches: branches
         }));
         alert("✅ Data sent to the bot!");
+        tg.close?.();
       } else {
         alert("⚠️ Telegram WebApp not available.");
       }
