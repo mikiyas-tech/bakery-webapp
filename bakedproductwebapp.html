@@ -94,7 +94,23 @@
             form.innerHTML = "<p>⚠️ No products to display.</p>";
         }
 
-        // ===== 3. Submit back to bot
+        // ===== 3. Listen for result from bot (ALWAYS READY)
+        tg.onEvent("web_app_result", (event) => {
+            try {
+                let result = JSON.parse(event.result);
+                let msg = "📋 Status:\n";
+                result.forEach(r => {
+                    msg += `${r.productname} → ${r.status}\n`;
+                });
+                alert(msg);
+            } catch (e) {
+                alert("⚠️ Error parsing result: " + e.message);
+            }
+            // ✅ Close after showing result
+            tg.close();
+        });
+
+        // ===== 4. Submit back to bot
         function submitData() {
             if (!products || products.length === 0) {
                 alert("⚠️ No data to submit.");
@@ -111,22 +127,6 @@
 
             // ✅ Send JSON string to Telegram bot
             tg.sendData(JSON.stringify(payload));
-
-            // 📌 Listen for result from bot
-            tg.onEvent("web_app_result", (event) => {
-                try {
-                    let result = JSON.parse(event.result);
-                    let msg = "📋 Status:\n";
-                    result.forEach(r => {
-                        msg += `${r.productname} → ${r.status}\n`;
-                    });
-                    alert(msg);
-                } catch (e) {
-                    alert("⚠️ Error parsing result: " + e.message);
-                }
-                // ✅ Close after showing result
-                tg.close();
-            });
         }
     </script>
 </body>
