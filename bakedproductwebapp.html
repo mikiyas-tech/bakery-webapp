@@ -66,11 +66,35 @@
   <h2>Baked Products Entry</h2>
   <form id="bakeForm"></form>
   <button type="button" onclick="submitData()">Submit</button>
+  <button type="button" onclick="testTelegram()" style="margin-top: 10px; background: #ff4444;">Test Telegram SDK</button>
+  <div id="debug" style="margin-top: 20px; padding: 10px; background: #333; border-radius: 5px; font-family: monospace; font-size: 12px;"></div>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
+    
+    function log(message) {
+        console.log(message);
+        document.getElementById('debug').innerHTML += message + '<br>';
+    }
+    
+    function testTelegram() {
+        log('=== Testing Telegram WebApp SDK ===');
+        log('tg object exists: ' + (typeof tg !== 'undefined'));
+        log('tg.ready available: ' + (typeof tg.ready === 'function'));
+        log('tg.sendData available: ' + (typeof tg.sendData === 'function'));
+        log('tg.close available: ' + (typeof tg.close === 'function'));
+        log('tg.initData: ' + (tg.initData || 'none'));
+        log('tg.initDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe || {}));
+        
+        try {
+            tg.sendData('{"test": "ping"}');
+            log('✅ sendData() called successfully');
+        } catch (e) {
+            log('❌ sendData() failed: ' + e.message);
+        }
+    }
 
     // === 1. Load products from URL param
     const urlParams = new URLSearchParams(window.location.search);
