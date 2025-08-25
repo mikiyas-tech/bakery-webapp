@@ -112,8 +112,21 @@
             // ✅ Send JSON string to Telegram bot
             tg.sendData(JSON.stringify(payload));
 
-            // Optionally close WebApp after sending
-            tg.close();
+            // 📌 Listen for result from bot
+            tg.onEvent("web_app_result", (event) => {
+                try {
+                    let result = JSON.parse(event.result);
+                    let msg = "📋 Status:\n";
+                    result.forEach(r => {
+                        msg += `${r.productname} → ${r.status}\n`;
+                    });
+                    alert(msg);
+                } catch (e) {
+                    alert("⚠️ Error parsing result: " + e.message);
+                }
+                // ✅ Close after showing result
+                tg.close();
+            });
         }
     </script>
 </body>
