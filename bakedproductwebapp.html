@@ -97,6 +97,8 @@
 
     // === 3. Submit back to bot
     function submitData() {
+      console.log("submitData() called");
+      
       if (!products || products.length === 0) {
         alert("⚠️ No data to submit.");
         return;
@@ -110,21 +112,33 @@
         }))
       };
 
+      console.log("Payload prepared:", payload);
+
       const hasAnyQuantity = payload.products.some(p => (p.quantity || 0) > 0);
       if (!hasAnyQuantity) {
         alert("⚠️ Please enter at least one non-zero quantity.");
         return;
       }
 
+      console.log("About to send data to bot...");
+      console.log("tg object:", tg);
+      console.log("tg.sendData available:", typeof tg.sendData);
+
       try {
-        tg.sendData(JSON.stringify({ ping: 1 }));
+        const dataString = JSON.stringify(payload);
+        console.log("Sending data string:", dataString);
+        tg.sendData(dataString);
+        console.log("sendData() called successfully");
         alert("✅ Data sent to the bot!");
-        if (tg.close) tg.close();
+        if (tg.close) {
+          console.log("Closing WebApp...");
+          tg.close();
+        }
       } catch (e) {
+        console.error("Error sending data:", e);
         alert("❌ Failed to send: " + (e?.message || e));
       }
     }
   </script>
 </body>
 </html>
-
