@@ -109,8 +109,19 @@
         }))
       };
 
-      // ✅ Send data to bot
-      tg.sendData(JSON.stringify(payload));
+      const hasAnyQuantity = payload.products.some(p => (p.quantity || 0) > 0);
+      if (!hasAnyQuantity) {
+        alert("⚠️ Please enter at least one non-zero quantity.");
+        return;
+      }
+
+      try {
+        tg.sendData(JSON.stringify(payload));
+        alert("✅ Data sent to the bot!");
+        if (tg.close) tg.close();
+      } catch (e) {
+        alert("❌ Failed to send: " + (e?.message || e));
+      }
     }
   </script>
 </body>
