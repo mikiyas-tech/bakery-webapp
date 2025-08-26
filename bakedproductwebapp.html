@@ -1,33 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Simple WebApp</title>
+  <meta charset="UTF-8">
+  <title>Baked Products Entry</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      padding: 20px;
+      color: #333;
+    }
+    label, input, button {
+      display: block;
+      margin-bottom: 15px;
+      width: 100%;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px;
+      background-color: #2a9df4;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #1a7fd4;
+    }
+  </style>
 </head>
 <body>
-<h2>Enter a Product Quantity</h2>
-<label>Quantity:</label>
-<input type="number" id="quantity" value="0" min="0">
-<button onclick="submitData()">Submit</button>
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script>
-  const tg = window.Telegram.WebApp;
+  <h2>Baked Products Form</h2>
 
-  document.getElementById("myForm").addEventListener("submit", function(e) {
-    e.preventDefault(); // prevent default form submission
+  <form id="bakedForm">
+    <label for="product">Product Name:</label>
+    <input type="text" id="product" name="product" required>
 
-    const data = {
-      product: document.getElementById("product").value,
-      quantity: document.getElementById("quantity").value
-    };
+    <label for="quantity">Quantity Baked:</label>
+    <input type="number" id="quantity" name="quantity" required>
 
-    // Send data to Telegram bot
-    tg.sendData(JSON.stringify(data));
+    <button type="submit">Submit</button>
+  </form>
 
-    // Close the WebApp
-    tg.close();
-  });
-</script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    const tg = window.Telegram.WebApp;
+
+    console.log("Telegram WebApp ready", tg.initData);
+
+    const form = document.getElementById("bakedForm");
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault(); // Prevent normal form submission
+
+      const data = {
+        product: document.getElementById("product").value,
+        quantity: document.getElementById("quantity").value
+      };
+
+      // Send the data to your Telegram bot
+      tg.sendData(JSON.stringify(data));
+
+      // Optionally close the WebApp
+      tg.close();
+    });
+  </script>
+
 </body>
 </html>
