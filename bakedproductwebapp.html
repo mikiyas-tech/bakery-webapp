@@ -103,7 +103,7 @@
       console.log("Submitting payload:", payload);
 
       try {
-        const response = await fetch("http://51.20.14.14:5000/api/bakedproducts", {
+        const response = await fetch("http://51.20.14.14:5000/api/insertdatabot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -119,3 +119,4 @@
   </script>
 </body>
 </html>
+
