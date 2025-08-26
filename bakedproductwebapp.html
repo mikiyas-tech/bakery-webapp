@@ -12,14 +12,22 @@
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-const tg = window.Telegram.WebApp;
-tg.ready();
+  const tg = window.Telegram.WebApp;
 
-function submitData() {
-  const quantity = parseInt(document.getElementById("quantity").value) || 0;
-  tg.sendData(JSON.stringify({ quantity }));
-  alert("✅ Sent to bot!");
-}
+  document.getElementById("myForm").addEventListener("submit", function(e) {
+    e.preventDefault(); // prevent default form submission
+
+    const data = {
+      product: document.getElementById("product").value,
+      quantity: document.getElementById("quantity").value
+    };
+
+    // Send data to Telegram bot
+    tg.sendData(JSON.stringify(data));
+
+    // Close the WebApp
+    tg.close();
+  });
 </script>
 </body>
 </html>
