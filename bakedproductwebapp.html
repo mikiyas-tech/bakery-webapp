@@ -51,15 +51,14 @@
   <button onclick="submitForm()">Submit</button>
 
   <script>
-    // Parse query parameters
+    // Get query params from URL
     function getQueryParam(param) {
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get(param);
     }
 
-    // Extract bakery/admin info
-    const bakeryid = getQueryParam("bakeryid");
-    const adminid = getQueryParam("adminid");
+    const bakeryid = parseInt(getQueryParam("bakeryid"));
+    const adminid = parseInt(getQueryParam("adminid"));
     const productsParam = getQueryParam("products");
 
     let products = [];
@@ -71,7 +70,7 @@
       }
     }
 
-    // Render products
+    // Render products dynamically
     const formDiv = document.getElementById("productsForm");
     if (products.length > 0) {
       products.forEach(p => {
@@ -79,7 +78,7 @@
         div.className = "product";
         div.innerHTML = `
           <label>${p.productname}</label>
-          <input type="number" id="prod_${p.productid}" placeholder="Quantity">
+          <input type="number" id="prod_${p.productid}" placeholder="Quantity" min="0">
         `;
         formDiv.appendChild(div);
       });
@@ -87,12 +86,12 @@
       formDiv.innerHTML = "<p>No products found.</p>";
     }
 
-    // Submit data to Flask API
+    // Submit form to Flask API
     async function submitForm() {
       const payload = {
-        bakeryid: parseInt(bakeryid),
-        adminid: parseInt(adminid),
-        dbname: "database1", // you can adjust per bakery
+        bakeryid,
+        adminid,
+        dbname: "database1", // change per bakery if needed
         products: products.map(p => ({
           productid: p.productid,
           productname: p.productname,
@@ -103,22 +102,24 @@
       console.log("Submitting payload:", payload);
 
       try {
-        const response = await fetch("http://51.20.14.14:5000/api/insertdatabot", {
+        const response = await fetch("http://51.20.14.14:5000//api/insertdatabot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
 
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`HTTP ${response.status}: ${text}`);
+        }
+
         const result = await response.json();
-        alert("Submitted successfully: " + JSON.stringify(result));
+        alert("✅ Submitted successfully: " + JSON.stringify(result));
       } catch (err) {
         console.error("Error submitting:", err);
-        alert(`Failed to submit data=${ err.message}` + err.message);
+        alert("❌ Failed to submit data: " + err.message);
       }
     }
   </script>
 </body>
 </html>
-
-
-
