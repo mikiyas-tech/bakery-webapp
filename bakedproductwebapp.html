@@ -5,130 +5,94 @@
   <title>Baked Products Entry</title>
   <style>
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background-color: #101010;
-      color: #e0e0e0;
-      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
       margin: 0;
+      padding: 20px;
     }
     h2 {
-      text-align: center;
-      color: #ffdd59;
-      margin-bottom: 25px;
-      text-shadow: 1px 1px 2px #000;
+      color: #333;
     }
     .product {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #222222;
-      padding: 10px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      margin: 10px 0;
+      padding: 10px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    .product label {
-      font-weight: 500;
-      color: #ffffff;
+    label {
+      display: block;
+      margin-bottom: 5px;
     }
-    input[type="number"] {
-      width: 70px;
-      padding: 5px;
-      border-radius: 5px;
-      border: 1px solid #555;
-      background: #181818;
-      color: #fff;
-      text-align: center;
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     button {
-      display: block;
-      width: 100%;
-      padding: 12px;
       margin-top: 20px;
-      background: linear-gradient(45deg, #444, #222);
-      color: #ffd700;
+      padding: 10px 15px;
+      background: #0078d7;
+      color: white;
       border: none;
-      border-radius: 10px;
-      font-weight: bold;
+      border-radius: 6px;
       cursor: pointer;
-      transition: 0.3s;
+      font-size: 16px;
     }
     button:hover {
-      background: linear-gradient(45deg, #666, #333);
-    }
-    #bakeForm {
-      max-width: 480px;
-      margin: 0 auto;
+      background: #005fa3;
     }
   </style>
 </head>
 <body>
   <h2>Baked Products Entry</h2>
-  <form id="bakeForm"></form>
-  <button type="button" onclick="submitData()">Submit</button>
-  <button type="button" onclick="testTelegram()" style="margin-top: 10px; background: #ff4444;">Test Telegram SDK</button>
-  <div id="debug" style="margin-top: 20px; padding: 10px; background: #333; border-radius: 5px; font-family: monospace; font-size: 12px;"></div>
+  <div id="productsForm"></div>
+  <button onclick="submitForm()">Submit</button>
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    
-    function log(message) {
-        console.log(message);
-        document.getElementById('debug').innerHTML += message + '<br>';
-    }
-    
-    function testTelegram() {
-        log('=== Testing Telegram WebApp SDK ===');
-        log('tg object exists: ' + (typeof tg !== 'undefined'));
-        log('tg.ready available: ' + (typeof tg.ready === 'function'));
-        log('tg.sendData available: ' + (typeof tg.sendData === 'function'));
-        log('tg.close available: ' + (typeof tg.close === 'function'));
-        log('tg.initData: ' + (tg.initData || 'none'));
-        log('tg.initDataUnsafe: ' + JSON.stringify(tg.initDataUnsafe || {}));
-        
-        try {
-            tg.sendData('{"test": "ping"}');
-            log('✅ sendData() called successfully');
-        } catch (e) {
-            log('❌ sendData() failed: ' + e.message);
-        }
+    // Parse query parameters
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
     }
 
-    // === 1. Load products from URL param
-    const urlParams = new URLSearchParams(window.location.search);
+    // Extract bakery/admin info
+    const bakeryid = getQueryParam("bakeryid");
+    const adminid = getQueryParam("adminid");
+    const productsParam = getQueryParam("products");
+
     let products = [];
-    try {
-      products = JSON.parse(decodeURIComponent(urlParams.get("data"))).products;
-    } catch (e) {
-      alert("⚠️ Could not load products: " + e.message);
+    if (productsParam) {
+      try {
+        products = JSON.parse(decodeURIComponent(productsParam));
+      } catch (e) {
+        console.error("Error parsing products:", e);
+      }
     }
 
-    // === 2. Render inputs
-    const form = document.getElementById("bakeForm");
-    if (products && products.length > 0) {
+    // Render products
+    const formDiv = document.getElementById("productsForm");
+    if (products.length > 0) {
       products.forEach(p => {
-        form.innerHTML += `
-          <div class="product">
-            <label>${p.productname}</label>
-            <input type="number" id="prod_${p.productid}" min="0" value="0">
-          </div>`;
+        const div = document.createElement("div");
+        div.className = "product";
+        div.innerHTML = `
+          <label>${p.productname}</label>
+          <input type="number" id="prod_${p.productid}" placeholder="Quantity">
+        `;
+        formDiv.appendChild(div);
       });
     } else {
-      form.innerHTML = "<p>⚠️ No products to display.</p>";
+      formDiv.innerHTML = "<p>No products found.</p>";
     }
 
-    // === 3. Submit back to bot
-    function submitData() {
-      console.log("submitData() called");
-      
-      if (!products || products.length === 0) {
-        alert("⚠️ No data to submit.");
-        return;
-      }
-
+    // Submit data to Flask API
+    async function submitForm() {
       const payload = {
+        bakeryid: parseInt(bakeryid),
+        adminid: parseInt(adminid),
+        dbname: "database1", // you can adjust per bakery
         products: products.map(p => ({
           productid: p.productid,
           productname: p.productname,
@@ -136,31 +100,20 @@
         }))
       };
 
-      console.log("Payload prepared:", payload);
-
-      const hasAnyQuantity = payload.products.some(p => (p.quantity || 0) > 0);
-      if (!hasAnyQuantity) {
-        alert("⚠️ Please enter at least one non-zero quantity.");
-        return;
-      }
-
-      console.log("About to send data to bot...");
-      console.log("tg object:", tg);
-      console.log("tg.sendData available:", typeof tg.sendData);
+      console.log("Submitting payload:", payload);
 
       try {
-        const dataString = JSON.stringify(payload);
-        console.log("Sending data string:", dataString);
-        tg.sendData(dataString);
-        console.log("sendData() called successfully");
-        alert("✅ Data sent to the bot!");
-        if (tg.close) {
-          console.log("Closing WebApp...");
-          tg.close();
-        }
-      } catch (e) {
-        console.error("Error sending data:", e);
-        alert("❌ Failed to send: " + (e?.message || e));
+        const response = await fetch("http://51.20.14.14:5000/api/bakedproducts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        alert("Submitted successfully: " + JSON.stringify(result));
+      } catch (err) {
+        console.error("Error submitting:", err);
+        alert("Failed to submit data.");
       }
     }
   </script>
