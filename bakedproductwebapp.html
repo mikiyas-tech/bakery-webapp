@@ -113,10 +113,11 @@
         alert("Submitted successfully: " + JSON.stringify(result));
       } catch (err) {
         console.error("Error submitting:", err);
-        alert("Failed to submit data.");
+        alert("Failed to submit data." + err.message);
       }
     }
   </script>
 </body>
 </html>
+
 
