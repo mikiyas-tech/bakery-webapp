@@ -157,7 +157,7 @@
         tg.close();
       } catch (err) {
         console.error(err);
-        alert("⚠️ Failed to save data.");
+        alert(`⚠️ Failed to load products${err.message ? ": " + err.message : ""}`);
       }
     });
 
@@ -165,3 +165,4 @@
   </script>
 </body>
 </html>
+
