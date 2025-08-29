@@ -9,73 +9,35 @@
       font-family: Arial, sans-serif;
       background-color: #121212;
       color: #e0e0e0;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
     }
     .container {
-      width: 90%;
-      max-width: 700px;
-      margin: 20px auto;
-      padding: 20px;
-      background: #1e1e1e;
-      border-radius: 12px;
+      width: 90%; max-width: 700px;
+      margin: 20px auto; padding: 20px;
+      background: #1e1e1e; border-radius: 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #ffffff;
-    }
-    .branch {
-      display: none;
-    }
-    .branch.active {
-      display: block;
-    }
+    h2 { text-align: center; margin-bottom: 20px; color: #ffffff; }
+    .branch { display: none; }
+    .branch.active { display: block; }
     .product {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      padding: 8px;
-      background: #2a2a2a;
-      border-radius: 8px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; padding: 8px;
+      background: #2a2a2a; border-radius: 8px;
     }
-    .product span {
-      font-weight: bold;
-      color: #e0e0e0;
-    }
+    .product span { font-weight: bold; color: #e0e0e0; }
     input[type="number"] {
-      width: 80px;
-      padding: 6px;
-      border-radius: 6px;
-      border: none;
-      text-align: center;
-      background: #121212;
-      color: #fff;
+      width: 80px; padding: 6px; border-radius: 6px;
+      border: none; text-align: center; background: #121212; color: #fff;
     }
     button {
-      padding: 12px 24px;
-      margin: 10px 5px 0 5px;
-      background: #333333;
-      border: none;
-      border-radius: 10px;
-      color: #ffffff;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.2s;
+      padding: 12px 24px; margin: 10px 5px 0 5px;
+      background: #333333; border: none; border-radius: 10px;
+      color: #ffffff; font-weight: bold; cursor: pointer; transition: 0.2s;
     }
-    button:hover {
-      background: #555555;
-    }
-    .buttons {
-      text-align: center;
-    }
-    h3 {
-      text-align: center;
-      margin-bottom: 15px;
-      color: #ffffff;
-    }
+    button:hover { background: #555555; }
+    .buttons { text-align: center; }
+    h3 { text-align: center; margin-bottom: 15px; color: #ffffff; }
   </style>
 </head>
 <body>
@@ -91,21 +53,28 @@
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    const tg = window.Telegram?.WebApp;
-    tg?.ready();
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const gist_url = urlParams.get("gist_url");  // original bot-created Gist
+    const GITHUB_TOKEN = urlParams.get("token"); // token passed from bot
+
     let branches = [];
+    let deliveryData = [];
     let currentBranchIndex = 0;
 
-    // Read data from URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const dataParam = urlParams.get('data');
-    if (dataParam) {
+    async function loadData() {
+      if (!gist_url) return alert("⚠️ No data source provided.");
       try {
-        const webappData = JSON.parse(decodeURIComponent(dataParam));
-        branches = webappData.branches || [];
-        window.deliveryData = webappData.delivery || {};
-      } catch (e) {
-        console.error("Failed to parse WebApp data:", e);
+        const res = await fetch(gist_url);
+        const data = await res.json();
+        branches = data.branches || [];
+        deliveryData = data.delivery || {};
+        renderBranch(currentBranchIndex);
+      } catch (err) {
+        console.error(err);
+        alert("⚠️ Failed to load delivery data.");
       }
     }
 
@@ -120,61 +89,56 @@
       branch.products.forEach(p => {
         const pDiv = document.createElement("div");
         pDiv.className = "product";
-        pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft})</span>
-                          <input type="number" min="0"
-                          data-productid="${p.productid}" data-productname="${p.productname}">`;
+        pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft || 0})</span>
+                          <input type="number" min="0" data-productid="${p.productid}" data-productname="${p.productname}">`;
         div.appendChild(pDiv);
       });
       container.appendChild(div);
     }
 
-    function prevBranch(){
-      if(currentBranchIndex > 0){
-        currentBranchIndex--;
-        renderBranch(currentBranchIndex);
-      }
+    function prevBranch(){ if(currentBranchIndex > 0){ currentBranchIndex--; renderBranch(currentBranchIndex); } }
+    function nextBranch(){ if(currentBranchIndex < branches.length -1){ currentBranchIndex++; renderBranch(currentBranchIndex); } }
+
+    async function createGist(submittedBranches){
+      const payload = { files: { "delivery_submission.json": { content: JSON.stringify({ branches: submittedBranches, delivery: deliveryData }, null, 2) } }, public: false };
+      const res = await fetch("https://api.github.com/gists", {
+        method: "POST",
+        headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error("Failed to create Gist");
+      const gist = await res.json();
+      return gist.files["delivery_submission.json"].raw_url;
     }
 
-    function nextBranch(){
-      if(currentBranchIndex < branches.length -1){
-        currentBranchIndex++;
-        renderBranch(currentBranchIndex);
-      }
+    async function deleteGist(originalUrl){
+      try {
+        const parts = originalUrl.split("/");
+        const gistId = parts[parts.indexOf("gists")+1]; if(!gistId) return;
+        await fetch(`https://api.github.com/gists/${gistId}`, { method:"DELETE", headers:{"Authorization":`token ${GITHUB_TOKEN}`} });
+      } catch(err){ console.warn("Could not delete original gist:", err); }
     }
 
-    function submitData(){
+    async function submitData(){
       // Collect quantities
-      const inputs = container.querySelectorAll(".branch input");
-      inputs.forEach(input => {
+      container.querySelectorAll(".branch input").forEach(input => {
         branches.forEach(branch => {
-          branch.products.forEach(p => {
-            if(p.productid == input.dataset.productid){
-              p.quantity = parseInt(input.value) || 0;
-            }
-          });
+          branch.products.forEach(p => { if(p.productid==input.dataset.productid) p.quantity = parseInt(input.value)||0; });
         });
       });
 
-      const hasAny = branches.some(b => (b.products || []).some(p => (p.quantity || 0) > 0));
-      if(!hasAny){
-        alert("⚠️ Please enter at least one non-zero quantity.");
-        return;
-      }
+      const hasAny = branches.some(b => (b.products||[]).some(p => (p.quantity||0) > 0));
+      if(!hasAny) return alert("⚠️ Please enter at least one non-zero quantity.");
 
-      // Send to Telegram bot
-      if(tg){
-        tg.sendData(JSON.stringify({
-          delivery: window.deliveryData,
-          branches: branches
-        }));
-        alert("✅ Data sent to the bot!");
-        tg.close?.();
-      } else {
-        alert("⚠️ Telegram WebApp not available.");
-      }
+      try {
+        const newGistUrl = await createGist(branches);
+        if(gist_url) await deleteGist(gist_url);
+        tg.sendData(JSON.stringify({ gist_url: newGistUrl }));
+        tg.close();
+      } catch(err){ console.error(err); alert("⚠️ Failed to save data."); }
     }
 
-    renderBranch(currentBranchIndex);
+    loadData();
   </script>
 </body>
 </html>
