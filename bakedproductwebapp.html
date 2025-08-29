@@ -12,12 +12,7 @@
       margin: 0;
       padding: 20px;
     }
-
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
+    h1 { text-align: center; color: #333; }
     .product-card {
       background-color: white;
       padding: 15px 20px;
@@ -28,12 +23,7 @@
       justify-content: space-between;
       align-items: center;
     }
-
-    .product-card label {
-      font-weight: bold;
-      font-size: 16px;
-    }
-
+    .product-card label { font-weight: bold; font-size: 16px; }
     .product-card input {
       width: 60px;
       padding: 5px;
@@ -41,7 +31,6 @@
       border: 1px solid #ccc;
       text-align: center;
     }
-
     #submit-btn {
       display: block;
       margin: 20px auto;
@@ -55,10 +44,7 @@
       cursor: pointer;
       transition: background-color 0.2s ease;
     }
-
-    #submit-btn:hover {
-      background-color: #0b72d3;
-    }
+    #submit-btn:hover { background-color: #0b72d3; }
   </style>
 </head>
 <body>
@@ -68,64 +54,114 @@
 
   <script>
     const tg = window.Telegram.WebApp;
+    tg.ready();
 
-    // Parse data from Telegram
-    const rawData = tg.initDataUnsafe?.query_id || null;
     const urlParams = new URLSearchParams(window.location.search);
-    const data = JSON.parse(decodeURIComponent(urlParams.get("data")));
+    const gist_url = urlParams.get("gist_url");
+    const GITHUB_TOKEN = "YOUR_GITHUB_PAT"; // ⚠️ Replace with your token
 
-    const productList = document.getElementById("product-list");
+    async function loadData() {
+      if (!gist_url) return alert("⚠️ No data source provided.");
+      try {
+        const res = await fetch(gist_url);
+        const data = await res.json();
+        const productList = document.getElementById("product-list");
+        productList.innerHTML = "";
 
-    // Dynamically create input fields
-    if (data.products && data.products.length > 0) {
-      data.products.forEach(product => {
-        const card = document.createElement("div");
-        card.className = "product-card";
+        if (data.products && data.products.length > 0) {
+          data.products.forEach(product => {
+            const card = document.createElement("div");
+            card.className = "product-card";
 
-        const label = document.createElement("label");
-        label.textContent = product.productname;
+            const label = document.createElement("label");
+            label.textContent = product.productname;
 
-        const input = document.createElement("input");
-        input.type = "number";
-        input.min = 0;
-        input.value = 0;
-        input.dataset.id = product.productid;
+            const input = document.createElement("input");
+            input.type = "number";
+            input.min = 0;
+            input.value = 0;
+            input.dataset.id = product.productid;
 
-        card.appendChild(label);
-        card.appendChild(input);
-        productList.appendChild(card);
-      });
-    } else {
-      productList.innerHTML = "<p>No products available</p>";
+            card.appendChild(label);
+            card.appendChild(input);
+            productList.appendChild(card);
+          });
+        } else {
+          productList.innerHTML = "<p>No products available</p>";
+        }
+      } catch (err) {
+        console.error(err);
+        alert("⚠️ Failed to load products.");
+      }
     }
 
-    // Handle submit
-    document.getElementById("submit-btn").addEventListener("click", () => {
+    async function createGist(products) {
+      const payload = {
+        files: {
+          "baked_submission.json": {
+            content: JSON.stringify({ products }, null, 2)
+          }
+        },
+        public: false
+      };
+
+      const res = await fetch("https://api.github.com/gists", {
+        method: "POST",
+        headers: {
+          "Authorization": `token ${GITHUB_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error("Failed to create gist");
+      const gist = await res.json();
+      return gist.files["baked_submission.json"].raw_url;
+    }
+
+    async function deleteGist(originalUrl) {
+      try {
+        const parts = originalUrl.split("/");
+        const gistId = parts[parts.indexOf("gists") + 1]; // extract gist ID
+        if (!gistId) return;
+
+        await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `token ${GITHUB_TOKEN}` }
+        });
+      } catch (err) {
+        console.warn("Could not delete original gist:", err);
+      }
+    }
+
+    document.getElementById("submit-btn").addEventListener("click", async () => {
       const products = [];
       document.querySelectorAll(".product-card input").forEach(input => {
         const qty = parseInt(input.value) || 0;
         if (qty > 0) {
-          products.push({
-            productid: input.dataset.id,
-            productname: input.previousSibling.textContent,
-            quantity: qty
-          });
+          products.push({ productid: input.dataset.id, quantity: qty });
         }
       });
 
-      if (products.length === 0) {
-        alert("Please enter at least one quantity.");
-        return;
+      if (products.length === 0) return alert("Please enter at least one quantity.");
+
+      try {
+        // Create a new gist with user’s submission
+        const newGistUrl = await createGist(products);
+
+        // Delete the original bot-created gist
+        if (gist_url) await deleteGist(gist_url);
+
+        // Send the new gist back to Telegram bot
+        tg.sendData(JSON.stringify({ gist_url: newGistUrl }));
+        tg.close();
+      } catch (err) {
+        console.error(err);
+        alert("⚠️ Failed to save data.");
       }
-
-      const payload = { products };
-
-      // Send back to Telegram bot
-      tg.sendData(JSON.stringify(payload));
-
-      // Optionally close WebApp after sending
-      tg.close();
     });
+
+    loadData();
   </script>
 </body>
 </html>
