@@ -38,12 +38,24 @@
     button:hover { background: #555555; }
     .buttons { text-align: center; }
     h3 { text-align: center; margin-bottom: 15px; color: #ffffff; }
+    select {
+      width: 100%; padding: 6px; border-radius: 6px; margin-bottom: 20px;
+      background: #2a2a2a; color: #fff; border: none; font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Delivery Form</h2>
+
+    <!-- Delivery dropdown -->
+    <label for="delivery-select" style="font-weight:bold;">Select Delivery (Plate No):</label>
+    <select id="delivery-select">
+      <option value="">-- Choose a delivery --</option>
+    </select>
+
     <div id="branches-container"></div>
+
     <div class="buttons">
       <button onclick="prevBranch()">Previous</button>
       <button onclick="nextBranch()">Next</button>
@@ -57,20 +69,25 @@
     tg.ready();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const gist_url = urlParams.get("gist_url");  // original bot-created Gist
-    const GITHUB_TOKEN = urlParams.get("token"); // token passed from bot
+    const gist_url = urlParams.get("gist_url");  // Gist from bot
+    const GITHUB_TOKEN = urlParams.get("token"); // Token passed from bot
 
     let branches = [];
     let deliveryData = [];
     let currentBranchIndex = 0;
 
+    const container = document.getElementById("branches-container");
+    const deliverySelect = document.getElementById("delivery-select");
+
+    // Load Gist data
     async function loadData() {
       if (!gist_url) return alert("⚠️ No data source provided.");
       try {
         const res = await fetch(gist_url);
         const data = await res.json();
         branches = data.branches || [];
-        deliveryData = data.delivery || {};
+        deliveryData = data.delivery || [];
+        populateDeliveryDropdown();
         renderBranch(currentBranchIndex);
       } catch (err) {
         console.error(err);
@@ -78,9 +95,18 @@
       }
     }
 
-    const container = document.getElementById("branches-container");
+    // Populate delivery dropdown with vicalplateno
+    function populateDeliveryDropdown() {
+      deliverySelect.innerHTML = '<option value="">-- Choose a delivery --</option>';
+      deliveryData.forEach(d => {
+        const option = document.createElement("option");
+        option.value = d.deliveryid;
+        option.textContent = d.vicalplateno;
+        deliverySelect.appendChild(option);
+      });
+    }
 
-    function renderBranch(index){
+    function renderBranch(index) {
       container.innerHTML = "";
       const branch = branches[index];
       const div = document.createElement("div");
@@ -96,11 +122,22 @@
       container.appendChild(div);
     }
 
-    function prevBranch(){ if(currentBranchIndex > 0){ currentBranchIndex--; renderBranch(currentBranchIndex); } }
-    function nextBranch(){ if(currentBranchIndex < branches.length -1){ currentBranchIndex++; renderBranch(currentBranchIndex); } }
+    function prevBranch() {
+      if(currentBranchIndex > 0){ currentBranchIndex--; renderBranch(currentBranchIndex); }
+    }
+    function nextBranch() {
+      if(currentBranchIndex < branches.length -1){ currentBranchIndex++; renderBranch(currentBranchIndex); }
+    }
 
-    async function createGist(submittedBranches){
-      const payload = { files: { "delivery_submission.json": { content: JSON.stringify({ branches: submittedBranches, delivery: deliveryData }, null, 2) } }, public: false };
+    async function createGist(submittedBranches, selectedDelivery) {
+      const payload = { 
+        files: { 
+          "delivery_submission.json": { 
+            content: JSON.stringify({ branches: submittedBranches, delivery: selectedDelivery }, null, 2) 
+          } 
+        }, 
+        public: false 
+      };
       const res = await fetch("https://api.github.com/gists", {
         method: "POST",
         headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
@@ -111,7 +148,7 @@
       return gist.files["delivery_submission.json"].raw_url;
     }
 
-    async function deleteGist(originalUrl){
+    async function deleteGist(originalUrl) {
       try {
         const parts = originalUrl.split("/");
         const gistId = parts[parts.indexOf("gists")+1]; if(!gistId) return;
@@ -119,7 +156,7 @@
       } catch(err){ console.warn("Could not delete original gist:", err); }
     }
 
-    async function submitData(){
+    async function submitData() {
       // Collect quantities
       container.querySelectorAll(".branch input").forEach(input => {
         branches.forEach(branch => {
@@ -130,10 +167,15 @@
       const hasAny = branches.some(b => (b.products||[]).some(p => (p.quantity||0) > 0));
       if(!hasAny) return alert("⚠️ Please enter at least one non-zero quantity.");
 
+      // Get selected delivery
+      const selectedDeliveryId = deliverySelect.value;
+      const selectedDelivery = deliveryData.find(d => d.deliveryid == selectedDeliveryId);
+      if(!selectedDelivery) return alert("⚠️ Please select a delivery.");
+
       try {
-        const newGistUrl = await createGist(branches);
+        const newGistUrl = await createGist(branches, selectedDelivery);
         if(gist_url) await deleteGist(gist_url);
-        tg.sendData(JSON.stringify({ gist_url: newGistUrl }));
+        tg.sendData(JSON.stringify({ gist_url: newGistUrl, delivery: selectedDelivery }));
         tg.close();
       } catch(err){ console.error(err); alert("⚠️ Failed to save data."); }
     }
