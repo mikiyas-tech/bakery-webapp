@@ -149,7 +149,8 @@
         const pDiv = document.createElement("div");
         pDiv.className = "product";
         pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft || 0})</span>
-                          <input type="number" min="0" data-productid="${p.productid}" value="${p.quantity || 0}">`;
+                          <input type="number" min="0" data-productid="${p.productid}" 
+                          placeholder="" value="">`;  <!-- 👈 empty box -->
         div.appendChild(pDiv);
       });
       container.appendChild(div);
@@ -160,7 +161,7 @@
       const inputs = container.querySelectorAll("input[type='number']");
       inputs.forEach(input => {
         const productId = input.dataset.productid;
-        const value = parseInt(input.value) || 0;
+        const value = input.value === "" ? 0 : parseInt(input.value); // 👈 treat empty as 0
         const product = branches[currentBranchIndex].products.find(p => p.productid == productId);
         if (product) product.quantity = value;
       });
