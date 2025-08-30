@@ -45,6 +45,36 @@
       transition: background-color 0.2s ease;
     }
     #submit-btn:hover { background-color: #0b72d3; }
+
+    /* 🔄 Loading overlay */
+    #loading {
+      display: none; /* hidden by default */
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #1e90ff;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      margin-top: 15px;
+      font-size: 18px;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -52,42 +82,66 @@
   <div id="product-list"></div>
   <button id="submit-btn">Submit</button>
 
+  <!-- 🔄 Loading Overlay -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading...</div>
+  </div>
+
   <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
     
     const urlParams = new URLSearchParams(window.location.search);
     const gist_url = urlParams.get("gist_url");
-    const GITHUB_TOKEN = urlParams.get("token"); // token passed from bot
-    
+    const GITHUB_TOKEN = urlParams.get("token"); 
+
+    const loading = document.getElementById("loading");
+    function showLoading(msg="Loading...") {
+      document.querySelector(".loading-text").textContent = msg;
+      loading.style.display = "flex";
+    }
+    function hideLoading() {
+      loading.style.display = "none";
+    }
+
     async function loadData() {
       if (!gist_url) return alert("⚠️ No data source provided.");
-      const res = await fetch(gist_url);
-      const data = await res.json();
-      const productList = document.getElementById("product-list");
-      productList.innerHTML = "";
+      try {
+        showLoading("Fetching products...");
+        const res = await fetch(gist_url);
+        const data = await res.json();
+        const productList = document.getElementById("product-list");
+        productList.innerHTML = "";
     
-      if (data.products && data.products.length > 0) {
-        data.products.forEach(product => {
-          const card = document.createElement("div");
-          card.className = "product-card";
-          const label = document.createElement("label");
-          label.textContent = product.productname;
-          const input = document.createElement("input");
-          input.type = "number"; 
-          input.min = 0; 
-          input.placeholder = "";   // 👈 empty placeholder
-          input.dataset.id = product.productid;
-          card.appendChild(label); 
-          card.appendChild(input); 
-          productList.appendChild(card);
-        });
-      } else { 
-        productList.innerHTML = "<p>No products available</p>"; 
+        if (data.products && data.products.length > 0) {
+          data.products.forEach(product => {
+            const card = document.createElement("div");
+            card.className = "product-card";
+            const label = document.createElement("label");
+            label.textContent = product.productname;
+            const input = document.createElement("input");
+            input.type = "number"; 
+            input.min = 0; 
+            input.placeholder = "";   // 👈 empty placeholder
+            input.dataset.id = product.productid;
+            card.appendChild(label); 
+            card.appendChild(input); 
+            productList.appendChild(card);
+          });
+        } else { 
+          productList.innerHTML = "<p>No products available</p>"; 
+        }
+      } catch(err){
+        alert("⚠️ Failed to load products.");
+        console.error(err);
+      } finally {
+        hideLoading();
       }
     }
     
     async function createGist(products) {
+      showLoading("Submitting...");
       const payload = { 
         files: { 
           "baked_submission.json": { content: JSON.stringify({ products }, null, 2) } 
@@ -133,6 +187,8 @@
       } catch(err){ 
         console.error(err); 
         alert("⚠️ Failed to save data."); 
+      } finally {
+        hideLoading();
       }
     });
     
