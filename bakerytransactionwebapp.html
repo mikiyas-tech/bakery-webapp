@@ -42,13 +42,36 @@
       width: 100%; padding: 6px; border-radius: 6px; margin-bottom: 20px;
       background: #2a2a2a; color: #fff; border: none; font-size: 16px;
     }
+    /* Loading overlay */
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #555;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Delivery Form</h2>
 
-    <!-- Delivery dropdown -->
     <label for="delivery-select" style="font-weight:bold;">Select Delivery (Plate No):</label>
     <select id="delivery-select">
       <option value="">-- Choose a delivery --</option>
@@ -63,14 +86,19 @@
     </div>
   </div>
 
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const gist_url = urlParams.get("gist_url");  // Gist from bot
-    const GITHUB_TOKEN = urlParams.get("token"); // Token passed from bot
+    const gist_url = urlParams.get("gist_url");
+    const GITHUB_TOKEN = urlParams.get("token");
 
     let branches = [];
     let deliveryData = [];
@@ -78,10 +106,14 @@
 
     const container = document.getElementById("branches-container");
     const deliverySelect = document.getElementById("delivery-select");
+    const loadingOverlay = document.getElementById("loading-overlay");
 
-    // Load Gist data
+    function showLoading() { loadingOverlay.style.display = "flex"; }
+    function hideLoading() { loadingOverlay.style.display = "none"; }
+
     async function loadData() {
       if (!gist_url) return alert("⚠️ No data source provided.");
+      showLoading();
       try {
         const res = await fetch(gist_url);
         const data = await res.json();
@@ -92,10 +124,11 @@
       } catch (err) {
         console.error(err);
         alert("⚠️ Failed to load delivery data.");
+      } finally {
+        hideLoading();
       }
     }
 
-    // Populate delivery dropdown with vicalplateno
     function populateDeliveryDropdown() {
       deliverySelect.innerHTML = '<option value="">-- Choose a delivery --</option>';
       deliveryData.forEach(d => {
@@ -116,17 +149,37 @@
         const pDiv = document.createElement("div");
         pDiv.className = "product";
         pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft || 0})</span>
-                          <input type="number" min="0" data-productid="${p.productid}" data-productname="${p.productname}">`;
+                          <input type="number" min="0" data-productid="${p.productid}" value="${p.quantity || 0}">`;
         div.appendChild(pDiv);
       });
       container.appendChild(div);
     }
 
-    function prevBranch() {
-      if(currentBranchIndex > 0){ currentBranchIndex--; renderBranch(currentBranchIndex); }
+    // Save current branch inputs back to data
+    function saveCurrentBranchData() {
+      const inputs = container.querySelectorAll("input[type='number']");
+      inputs.forEach(input => {
+        const productId = input.dataset.productid;
+        const value = parseInt(input.value) || 0;
+        const product = branches[currentBranchIndex].products.find(p => p.productid == productId);
+        if (product) product.quantity = value;
+      });
     }
+
+    function prevBranch() {
+      saveCurrentBranchData();
+      if (currentBranchIndex > 0) {
+        currentBranchIndex--;
+        renderBranch(currentBranchIndex);
+      }
+    }
+
     function nextBranch() {
-      if(currentBranchIndex < branches.length -1){ currentBranchIndex++; renderBranch(currentBranchIndex); }
+      saveCurrentBranchData();
+      if (currentBranchIndex < branches.length - 1) {
+        currentBranchIndex++;
+        renderBranch(currentBranchIndex);
+      }
     }
 
     async function createGist(submittedBranches, selectedDelivery) {
@@ -157,27 +210,33 @@
     }
 
     async function submitData() {
-      // Collect quantities
-      container.querySelectorAll(".branch input").forEach(input => {
-        branches.forEach(branch => {
-          branch.products.forEach(p => { if(p.productid==input.dataset.productid) p.quantity = parseInt(input.value)||0; });
-        });
-      });
+      saveCurrentBranchData(); // make sure last branch is saved
 
-      const hasAny = branches.some(b => (b.products||[]).some(p => (p.quantity||0) > 0));
-      if(!hasAny) return alert("⚠️ Please enter at least one non-zero quantity.");
+      // Collect quantities and filter out 0s
+      const submittedBranches = branches.map(b => ({
+        branchid: b.branchid,
+        branchname: b.branchname,
+        products: b.products.filter(p => (p.quantity || 0) > 0)
+      })).filter(b => b.products.length > 0);
 
-      // Get selected delivery
+      if(submittedBranches.length === 0) return alert("⚠️ Please enter at least one product with quantity > 0.");
+
       const selectedDeliveryId = deliverySelect.value;
-      const selectedDelivery = deliveryData.find(d => d.deliveryid == selectedDeliveryId);
+      const selectedDelivery = deliveryData.find(d => d.deliveryid==selectedDeliveryId);
       if(!selectedDelivery) return alert("⚠️ Please select a delivery.");
 
+      showLoading();
       try {
-        const newGistUrl = await createGist(branches, selectedDelivery);
+        const newGistUrl = await createGist(submittedBranches, selectedDelivery);
         if(gist_url) await deleteGist(gist_url);
         tg.sendData(JSON.stringify({ gist_url: newGistUrl, delivery: selectedDelivery }));
         tg.close();
-      } catch(err){ console.error(err); alert("⚠️ Failed to save data."); }
+      } catch(err) {
+        console.error(err);
+        alert("⚠️ Failed to save data.");
+      } finally {
+        hideLoading();
+      }
     }
 
     loadData();
