@@ -149,8 +149,7 @@
         const pDiv = document.createElement("div");
         pDiv.className = "product";
         pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft || 0})</span>
-                          <input type="number" min="0" data-productid="${p.productid}" 
-                          placeholder="" value="">`;  <!-- 👈 empty box -->
+                          <input type="number" min="0" data-productid="${p.productid}" placeholder="" value="${p.quantity || ''}">`;
         div.appendChild(pDiv);
       });
       container.appendChild(div);
@@ -161,7 +160,7 @@
       const inputs = container.querySelectorAll("input[type='number']");
       inputs.forEach(input => {
         const productId = input.dataset.productid;
-        const value = input.value === "" ? 0 : parseInt(input.value); // 👈 treat empty as 0
+        const value = input.value === "" ? 0 : parseInt(input.value); // empty treated as 0
         const product = branches[currentBranchIndex].products.find(p => p.productid == productId);
         if (product) product.quantity = value;
       });
@@ -205,15 +204,15 @@
     async function deleteGist(originalUrl) {
       try {
         const parts = originalUrl.split("/");
-        const gistId = parts[parts.indexOf("gists")+1]; if(!gistId) return;
+        const gistId = parts[parts.indexOf("gists")+1]; 
+        if(!gistId) return;
         await fetch(`https://api.github.com/gists/${gistId}`, { method:"DELETE", headers:{"Authorization":`token ${GITHUB_TOKEN}`} });
       } catch(err){ console.warn("Could not delete original gist:", err); }
     }
 
     async function submitData() {
-      saveCurrentBranchData(); // make sure last branch is saved
+      saveCurrentBranchData(); // ensure last branch is saved
 
-      // Collect quantities and filter out 0s
       const submittedBranches = branches.map(b => ({
         branchid: b.branchid,
         branchname: b.branchname,
