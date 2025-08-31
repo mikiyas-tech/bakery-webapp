@@ -2,249 +2,126 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Delivery Form</title>
+  <title>Bakery Transaction</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: #e0e0e0;
-      margin: 0; padding: 0;
+      background: #101010;
+      color: #f1f1f1;
+      padding: 20px;
     }
-    .container {
-      width: 90%; max-width: 700px;
-      margin: 20px auto; padding: 20px;
-      background: #1e1e1e; border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
     }
-    h2 { text-align: center; margin-bottom: 20px; color: #ffffff; }
-    .branch { display: none; }
-    .branch.active { display: block; }
+    .branch {
+      margin-bottom: 30px;
+      padding: 15px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1e1e1e;
+    }
     .product {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 12px; padding: 8px;
-      background: #2a2a2a; border-radius: 8px;
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #2a2a2a;
     }
-    .product span { font-weight: bold; color: #e0e0e0; }
-    input[type="number"] {
-      width: 80px; padding: 6px; border-radius: 6px;
-      border: none; text-align: center; background: #121212; color: #fff;
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input {
+      padding: 6px;
+      width: 100%;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      border: 1px solid #666;
+      background: #111;
+      color: #fff;
     }
     button {
-      padding: 12px 24px; margin: 10px 5px 0 5px;
-      background: #333333; border: none; border-radius: 10px;
-      color: #ffffff; font-weight: bold; cursor: pointer; transition: 0.2s;
-    }
-    button:hover { background: #555555; }
-    .buttons { text-align: center; }
-    h3 { text-align: center; margin-bottom: 15px; color: #ffffff; }
-    select {
-      width: 100%; padding: 6px; border-radius: 6px; margin-bottom: 20px;
-      background: #2a2a2a; color: #fff; border: none; font-size: 16px;
-    }
-    /* Loading overlay */
-    #loading-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      display: none;
+      background: #28a745;
       color: #fff;
-      font-size: 18px;
-      font-weight: bold;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
-    .spinner {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #555;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 10px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    button:hover {
+      background: #218838;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Delivery Form</h2>
-
-    <label for="delivery-select" style="font-weight:bold;">Select Delivery (Plate No):</label>
-    <select id="delivery-select">
-      <option value="">-- Choose a delivery --</option>
-    </select>
-
-    <div id="branches-container"></div>
-
-    <div class="buttons">
-      <button onclick="prevBranch()">Previous</button>
-      <button onclick="nextBranch()">Next</button>
-      <button onclick="submitData()">Submit</button>
-    </div>
-  </div>
-
-  <!-- Loading overlay -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <div id="loading-text">Loading...</div>
-  </div>
+  <h1>Bakery Transaction</h1>
+  <div id="form-container"></div>
+  <button onclick="submitForm()">Submit</button>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-
     const urlParams = new URLSearchParams(window.location.search);
-    const gist_url = urlParams.get("gist_url");
-    const GITHUB_TOKEN = urlParams.get("token");
+    const gistUrl = urlParams.get("gist_url");
+    const token = urlParams.get("token");
 
-    let branches = [];
-    let deliveryData = [];
-    let currentBranchIndex = 0;
-
-    const container = document.getElementById("branches-container");
-    const deliverySelect = document.getElementById("delivery-select");
-    const loadingOverlay = document.getElementById("loading-overlay");
-    const loadingText = document.getElementById("loading-text");
-
-    function showLoading(message) {
-      loadingText.textContent = message || "Loading...";
-      loadingOverlay.style.display = "flex";
+    function formatDateTime(dateStr) {
+      if (!dateStr) return "N/A";
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr; // fallback
+      return d.toLocaleString("en-GB", {
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
     }
-    function hideLoading() { loadingOverlay.style.display = "none"; }
 
     async function loadData() {
-      if (!gist_url) return alert("⚠️ No data source provided.");
-      showLoading("Fetching...");
       try {
-        const res = await fetch(gist_url);
-        const data = await res.json();
-        branches = data.branches || [];
-        deliveryData = data.delivery || [];
-        populateDeliveryDropdown();
-        renderBranch(currentBranchIndex);
+        const response = await fetch(gistUrl + "?token=" + token);
+        const data = await response.json();
+
+        const container = document.getElementById("form-container");
+
+        data.branches.forEach(branch => {
+          const branchDiv = document.createElement("div");
+          branchDiv.classList.add("branch");
+          branchDiv.innerHTML = `<h2>${branch.branchname}</h2>`;
+
+          branch.products.forEach(product => {
+            const productDiv = document.createElement("div");
+            productDiv.classList.add("product");
+            productDiv.innerHTML = `
+              <label>${product.productname} (Baked: ${product.numberofproductbaked}, Left: ${product.productsleft}, Time: ${formatDateTime(product.timeofbakery)})</label>
+              <input type="number" name="product_${branch.branchid}_${product.productid}" placeholder="Quantity to send" min="0">
+            `;
+            branchDiv.appendChild(productDiv);
+          });
+
+          container.appendChild(branchDiv);
+        });
       } catch (err) {
-        console.error(err);
-        alert("⚠️ Failed to load delivery data.");
-      } finally {
-        hideLoading();
+        document.getElementById("form-container").innerHTML = "❌ Error loading data: " + err;
       }
     }
 
-    function populateDeliveryDropdown() {
-      deliverySelect.innerHTML = '<option value="">-- Choose a delivery --</option>';
-      deliveryData.forEach(d => {
-        const option = document.createElement("option");
-        option.value = d.deliveryid;
-        option.textContent = d.vicalplateno;
-        deliverySelect.appendChild(option);
-      });
-    }
+    function submitForm() {
+      const inputs = document.querySelectorAll("input");
+      let result = [];
 
-    function renderBranch(index) {
-      container.innerHTML = "";
-      const branch = branches[index];
-      const div = document.createElement("div");
-      div.className = "branch active";
-      div.innerHTML = `<h3>${branch.branchname}</h3>`;
-      branch.products.forEach(p => {
-        const pDiv = document.createElement("div");
-        pDiv.className = "product";
-        pDiv.innerHTML = `<span>${p.productname} (left: ${p.totalleft || 0})</span>
-                          <input type="number" min="0" data-productid="${p.productid}" placeholder="" value="${p.quantity || ''}">`;
-        div.appendChild(pDiv);
-      });
-      container.appendChild(div);
-    }
-
-    function saveCurrentBranchData() {
-      const inputs = container.querySelectorAll("input[type='number']");
       inputs.forEach(input => {
-        const productId = input.dataset.productid;
-        const value = input.value === "" ? 0 : parseInt(input.value);
-        const product = branches[currentBranchIndex].products.find(p => p.productid == productId);
-        if (product) product.quantity = value;
+        const [_, branchId, productId] = input.name.split("_");
+        const quantity = parseInt(input.value || "0", 10);
+
+        result.push({
+          branchid: branchId,
+          productid: productId,
+          quantity: quantity
+        });
       });
-    }
 
-    function prevBranch() {
-      saveCurrentBranchData();
-      if (currentBranchIndex > 0) {
-        currentBranchIndex--;
-        renderBranch(currentBranchIndex);
-      }
-    }
-
-    function nextBranch() {
-      saveCurrentBranchData();
-      if (currentBranchIndex < branches.length - 1) {
-        currentBranchIndex++;
-        renderBranch(currentBranchIndex);
-      }
-    }
-
-    async function createGist(submittedBranches, selectedDelivery) {
-      const payload = { 
-        files: { 
-          "delivery_submission.json": { 
-            content: JSON.stringify({ branches: submittedBranches, delivery: selectedDelivery }, null, 2) 
-          } 
-        }, 
-        public: false 
-      };
-      const res = await fetch("https://api.github.com/gists", {
-        method: "POST",
-        headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if(!res.ok) throw new Error("Failed to create Gist");
-      const gist = await res.json();
-      return gist.files["delivery_submission.json"].raw_url;
-    }
-
-    async function deleteGist(originalUrl) {
-      try {
-        const parts = originalUrl.split("/");
-        const gistId = parts[parts.indexOf("gists")+1]; 
-        if(!gistId) return;
-        await fetch(`https://api.github.com/gists/${gistId}`, { method:"DELETE", headers:{"Authorization":`token ${GITHUB_TOKEN}`} });
-      } catch(err){ console.warn("Could not delete original gist:", err); }
-    }
-
-    async function submitData() {
-      saveCurrentBranchData();
-      const submittedBranches = branches.map(b => ({
-        branchid: b.branchid,
-        branchname: b.branchname,
-        products: b.products.filter(p => (p.quantity || 0) > 0)
-      })).filter(b => b.products.length > 0);
-
-      if(submittedBranches.length === 0) return alert("⚠️ Please enter at least one product with quantity > 0.");
-
-      const selectedDeliveryId = deliverySelect.value;
-      const selectedDelivery = deliveryData.find(d => d.deliveryid==selectedDeliveryId);
-      if(!selectedDelivery) return alert("⚠️ Please select a delivery.");
-
-      showLoading("Submitting...");
-      try {
-        const newGistUrl = await createGist(submittedBranches, selectedDelivery);
-        if(gist_url) await deleteGist(gist_url);
-        tg.sendData(JSON.stringify({ gist_url: newGistUrl, delivery: selectedDelivery }));
-        tg.close();
-      } catch(err) {
-        console.error(err);
-        alert("⚠️ Failed to save data.");
-      } finally {
-        hideLoading();
-      }
+      Telegram.WebApp.sendData(JSON.stringify(result));
     }
 
     loadData();
