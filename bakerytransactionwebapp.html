@@ -127,12 +127,12 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const gistUrl = urlParams.get("gist_url");
-    const token = urlParams.get("token");
+    const GITHUB_TOKEN = urlParams.get("token");
 
     let data = null;
     let deliveryData = [];
     let currentBranchIndex = 0;
-    const branchInputs = {};
+    const branchInputs = {}; // store inputs per branch
 
     const spinner = document.getElementById("spinner");
     const spinnerText = document.getElementById("spinner-text");
@@ -154,7 +154,7 @@
     async function loadData() {
       try {
         showSpinner("Fetching");
-        const res = await fetch(gistUrl + "?token=" + token);
+        const res = await fetch(gistUrl + "?token=" + GITHUB_TOKEN);
         data = await res.json();
         deliveryData = data.delivery || [];
         populateDeliveryDropdown();
@@ -212,19 +212,47 @@
     function prevBranch() { if(currentBranchIndex>0){currentBranchIndex--; showBranch(currentBranchIndex);} }
     function nextBranch() { if(currentBranchIndex<data.branches.length-1){currentBranchIndex++; showBranch(currentBranchIndex);} }
 
-    function submitForm() {
+    async function submitForm() {
       saveBranchInputs();
       const selectedDeliveryId = deliverySelect.value;
       if (!selectedDeliveryId) return alert("⚠️ Please select a delivery.");
-      let result = [];
+
+      let submittedBranches = [];
       Object.keys(branchInputs).forEach(branchId => {
         const products = branchInputs[branchId];
         Object.keys(products).forEach(productId => {
-          result.push({ branchid: branchId, productid: productId, quantity: parseInt(products[productId],10) });
+          submittedBranches.push({
+            branchid: branchId,
+            productid: productId,
+            quantity: parseInt(products[productId],10)
+          });
         });
       });
+
       showSpinner("Submitting");
-      Telegram.WebApp.sendData(JSON.stringify({ deliveryid:selectedDeliveryId, branches:result }));
+
+      try {
+        const payload = { 
+          files: { 
+            "delivery_submission.json": { 
+              content: JSON.stringify({ branches: submittedBranches, delivery: selectedDeliveryId }, null, 2) 
+            } 
+          }, 
+          public: false 
+        };
+
+        const res = await fetch("https://api.github.com/gists", {
+          method: "POST",
+          headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const gist = await res.json();
+        Telegram.WebApp.sendData(JSON.stringify({ gist_url: gist.files["delivery_submission.json"].raw_url, delivery: selectedDeliveryId }));
+      } catch(err) {
+        alert("❌ Failed to submit: " + err);
+      } finally {
+        hideSpinner();
+      }
     }
 
     loadData();
