@@ -57,8 +57,7 @@
       color: #777;
     }
     button {
-      display: block;
-      margin: 20px auto;
+      margin: 10px;
       background: #28a745;
       color: #fff;
       padding: 12px 20px;
@@ -72,12 +71,58 @@
     button:hover {
       background: #218838;
     }
+    #controls {
+      text-align: center;
+      margin-top: 15px;
+    }
+    .hidden {
+      display: none;
+    }
+    /* Spinner style */
+    #spinner {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      z-index: 1000;
+      display: none;
+    }
+    .spinner-circle {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #ffcc00;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
   <h1>Bakery Transaction</h1>
-  <div id="form-container"></div>
-  <button onclick="submitForm()">Submit</button>
+  <div id="spinner">
+    <div class="spinner-circle"></div>
+    <div id="spinner-text">Loading...</div>
+  </div>
+  <div id="form-container" class="hidden"></div>
+
+  <div id="controls" class="hidden">
+    <button onclick="prevBranch()">⬅ Previous</button>
+    <button onclick="nextBranch()">Next ➡</button>
+    <button onclick="submitForm()">✅ Submit</button>
+  </div>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
@@ -85,10 +130,25 @@
     const gistUrl = urlParams.get("gist_url");
     const token = urlParams.get("token");
 
+    let data = null;
+    let currentBranchIndex = 0;
+    const branchInputs = {};
+
+    const spinner = document.getElementById("spinner");
+    const spinnerText = document.getElementById("spinner-text");
+
+    function showSpinner(message) {
+      spinnerText.textContent = message;
+      spinner.style.display = "flex";
+    }
+    function hideSpinner() {
+      spinner.style.display = "none";
+    }
+
     function formatDateTime(dateStr) {
       if (!dateStr) return "N/A";
       const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr; // fallback
+      if (isNaN(d.getTime())) return dateStr;
       return d.toLocaleString("en-GB", {
         day: "2-digit",
         hour: "2-digit",
@@ -99,48 +159,85 @@
 
     async function loadData() {
       try {
+        showSpinner("🔄 Fetching...");
         const response = await fetch(gistUrl + "?token=" + token);
-        const data = await response.json();
-
-        const container = document.getElementById("form-container");
-
-        data.branches.forEach(branch => {
-          const branchDiv = document.createElement("div");
-          branchDiv.classList.add("branch");
-          branchDiv.innerHTML = `<h2>${branch.branchname}</h2>`;
-
-          branch.products.forEach(product => {
-            const productDiv = document.createElement("div");
-            productDiv.classList.add("product");
-            productDiv.innerHTML = `
-              <label>${product.productname} (Left: ${product.productsleft}, Time: ${formatDateTime(product.timeofbakery)})</label>
-              <input type="number" name="product_${branch.branchid}_${product.productid}" placeholder="Enter quantity" min="0">
-            `;
-            branchDiv.appendChild(productDiv);
-          });
-
-          container.appendChild(branchDiv);
-        });
+        data = await response.json();
+        hideSpinner();
+        document.getElementById("form-container").classList.remove("hidden");
+        document.getElementById("controls").classList.remove("hidden");
+        showBranch(currentBranchIndex);
       } catch (err) {
+        hideSpinner();
         document.getElementById("form-container").innerHTML = "❌ Error loading data: " + err;
       }
     }
 
+    function saveBranchInputs() {
+      const inputs = document.querySelectorAll("#form-container input");
+      const branchId = data.branches[currentBranchIndex].branchid;
+      if (!branchInputs[branchId]) branchInputs[branchId] = {};
+      inputs.forEach(input => {
+        const productId = input.name.split("_")[2];
+        branchInputs[branchId][productId] = input.value || "0";
+      });
+    }
+
+    function showBranch(index) {
+      saveBranchInputs();
+      const container = document.getElementById("form-container");
+      container.innerHTML = "";
+
+      const branch = data.branches[index];
+      const branchDiv = document.createElement("div");
+      branchDiv.classList.add("branch");
+      branchDiv.innerHTML = `<h2>${branch.branchname}</h2>`;
+
+      branch.products.forEach(product => {
+        const productDiv = document.createElement("div");
+        productDiv.classList.add("product");
+        const prevValue = branchInputs[branch.branchid]?.[product.productid] || "";
+        productDiv.innerHTML = `
+          <label>${product.productname} 
+            (Left: ${product.productsleft}, Time: ${formatDateTime(product.timeofbakery)})
+          </label>
+          <input type="number" name="product_${branch.branchid}_${product.productid}" placeholder="Enter quantity" min="0" value="${prevValue}">
+        `;
+        branchDiv.appendChild(productDiv);
+      });
+
+      container.appendChild(branchDiv);
+    }
+
+    function prevBranch() {
+      if (currentBranchIndex > 0) {
+        currentBranchIndex--;
+        showBranch(currentBranchIndex);
+      }
+    }
+
+    function nextBranch() {
+      if (currentBranchIndex < data.branches.length - 1) {
+        currentBranchIndex++;
+        showBranch(currentBranchIndex);
+      }
+    }
+
     function submitForm() {
-      const inputs = document.querySelectorAll("input");
+      saveBranchInputs();
       let result = [];
 
-      inputs.forEach(input => {
-        const [_, branchId, productId] = input.name.split("_");
-        const quantity = parseInt(input.value || "0", 10);
-
-        result.push({
-          branchid: branchId,
-          productid: productId,
-          quantity: quantity
+      Object.keys(branchInputs).forEach(branchId => {
+        const products = branchInputs[branchId];
+        Object.keys(products).forEach(productId => {
+          result.push({
+            branchid: branchId,
+            productid: productId,
+            quantity: parseInt(products[productId], 10)
+          });
         });
       });
 
+      showSpinner("⏳ Submitting...");
       Telegram.WebApp.sendData(JSON.stringify(result));
     }
 
