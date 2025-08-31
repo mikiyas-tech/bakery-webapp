@@ -17,6 +17,16 @@
       font-size: 24px;
       color: #ffcc00;
     }
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      background: #111;
+      color: #fff;
+      border: 1px solid #555;
+      font-size: 16px;
+    }
     .branch {
       margin-bottom: 25px;
       padding: 15px;
@@ -53,9 +63,7 @@
       font-size: 14px;
       box-sizing: border-box;
     }
-    input::placeholder {
-      color: #777;
-    }
+    input::placeholder { color: #777; }
     button {
       margin: 10px;
       background: #28a745;
@@ -68,27 +76,16 @@
       cursor: pointer;
       transition: background 0.3s;
     }
-    button:hover {
-      background: #218838;
-    }
-    #controls {
-      text-align: center;
-      margin-top: 15px;
-    }
-    .hidden {
-      display: none;
-    }
-    /* Spinner style */
+    button:hover { background: #218838; }
+    #controls { text-align: center; margin-top: 15px; }
+    .hidden { display: none; }
     #spinner {
       position: fixed;
       top: 0; left: 0;
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       background: rgba(0,0,0,0.7);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
       color: #fff;
       font-size: 18px;
       font-weight: bold;
@@ -104,24 +101,26 @@
       animation: spin 1s linear infinite;
       margin-bottom: 10px;
     }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <h1>Bakery Transaction</h1>
+
+  <select id="delivery-select">
+    <option value="">-- Select Delivery --</option>
+  </select>
+
   <div id="spinner">
     <div class="spinner-circle"></div>
     <div id="spinner-text">Loading...</div>
   </div>
-  <div id="form-container" class="hidden"></div>
 
+  <div id="form-container" class="hidden"></div>
   <div id="controls" class="hidden">
     <button onclick="prevBranch()">⬅ Previous</button>
     <button onclick="nextBranch()">Next ➡</button>
-    <button onclick="submitForm()">✅ Submit</button>
+    <button onclick="submitForm()">Submit</button>
   </div>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -131,45 +130,52 @@
     const token = urlParams.get("token");
 
     let data = null;
+    let deliveryData = [];
     let currentBranchIndex = 0;
     const branchInputs = {};
 
     const spinner = document.getElementById("spinner");
     const spinnerText = document.getElementById("spinner-text");
+    const deliverySelect = document.getElementById("delivery-select");
 
     function showSpinner(message) {
       spinnerText.textContent = message;
       spinner.style.display = "flex";
     }
-    function hideSpinner() {
-      spinner.style.display = "none";
-    }
+    function hideSpinner() { spinner.style.display = "none"; }
 
     function formatDateTime(dateStr) {
       if (!dateStr) return "N/A";
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleString("en-GB", {
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      });
+      return d.toLocaleString("en-GB", { day:"2-digit", hour:"2-digit", minute:"2-digit", hour12:false });
     }
 
     async function loadData() {
       try {
-        showSpinner("🔄 Fetching...");
-        const response = await fetch(gistUrl + "?token=" + token);
-        data = await response.json();
+        showSpinner("Fetching");
+        const res = await fetch(gistUrl + "?token=" + token);
+        data = await res.json();
+        deliveryData = data.delivery || [];
+        populateDeliveryDropdown();
         hideSpinner();
         document.getElementById("form-container").classList.remove("hidden");
         document.getElementById("controls").classList.remove("hidden");
         showBranch(currentBranchIndex);
-      } catch (err) {
+      } catch(err) {
         hideSpinner();
         document.getElementById("form-container").innerHTML = "❌ Error loading data: " + err;
       }
+    }
+
+    function populateDeliveryDropdown() {
+      deliverySelect.innerHTML = '<option value="">-- Select Delivery --</option>';
+      deliveryData.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d.deliveryid;
+        opt.textContent = d.vicalplateno || d.deliveryid;
+        deliverySelect.appendChild(opt);
+      });
     }
 
     function saveBranchInputs() {
@@ -186,59 +192,39 @@
       saveBranchInputs();
       const container = document.getElementById("form-container");
       container.innerHTML = "";
-
       const branch = data.branches[index];
       const branchDiv = document.createElement("div");
       branchDiv.classList.add("branch");
       branchDiv.innerHTML = `<h2>${branch.branchname}</h2>`;
-
       branch.products.forEach(product => {
         const productDiv = document.createElement("div");
         productDiv.classList.add("product");
         const prevValue = branchInputs[branch.branchid]?.[product.productid] || "";
         productDiv.innerHTML = `
-          <label>${product.productname} 
-            (Left: ${product.productsleft}, Time: ${formatDateTime(product.timeofbakery)})
-          </label>
+          <label>${product.productname} (Left: ${product.productsleft}, Time: ${formatDateTime(product.timeofbakery)})</label>
           <input type="number" name="product_${branch.branchid}_${product.productid}" placeholder="Enter quantity" min="0" value="${prevValue}">
         `;
         branchDiv.appendChild(productDiv);
       });
-
       container.appendChild(branchDiv);
     }
 
-    function prevBranch() {
-      if (currentBranchIndex > 0) {
-        currentBranchIndex--;
-        showBranch(currentBranchIndex);
-      }
-    }
-
-    function nextBranch() {
-      if (currentBranchIndex < data.branches.length - 1) {
-        currentBranchIndex++;
-        showBranch(currentBranchIndex);
-      }
-    }
+    function prevBranch() { if(currentBranchIndex>0){currentBranchIndex--; showBranch(currentBranchIndex);} }
+    function nextBranch() { if(currentBranchIndex<data.branches.length-1){currentBranchIndex++; showBranch(currentBranchIndex);} }
 
     function submitForm() {
       saveBranchInputs();
+      const selectedDeliveryId = deliverySelect.value;
+      if (!selectedDeliveryId) return alert("⚠️ Please select a delivery.");
       let result = [];
-
       Object.keys(branchInputs).forEach(branchId => {
         const products = branchInputs[branchId];
         Object.keys(products).forEach(productId => {
-          result.push({
-            branchid: branchId,
-            productid: productId,
-            quantity: parseInt(products[productId], 10)
-          });
+          result.push({ branchid: branchId, productid: productId, quantity: parseInt(products[productId],10) });
         });
       });
-
-      showSpinner("⏳ Submitting...");
-      Telegram.WebApp.sendData(JSON.stringify(result));
+      showSpinner("Submitting");
+      Telegram.WebApp.sendData(JSON.stringify({ deliveryid:selectedDeliveryId, branches:result }));
     }
 
     loadData();
