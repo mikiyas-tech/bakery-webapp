@@ -110,7 +110,7 @@
       branch.products.forEach(p => {
         const pDiv = document.createElement("div");
         pDiv.className = "product";
-        pDiv.innerHTML = `<span>${p.productname} (Left: ${p.totalleft || 0}, Time: ${formatDateTime(p.timeofbakery)})</span>
+        pDiv.innerHTML = `<span>${p.productname} (Left: ${p.productsleft || 0}, Time: ${formatDateTime(p.timeofbakery)})</span>
                           <input type="number" min="0" data-productid="${p.productid}" placeholder="" value="${p.quantity || ''}">`;
         div.appendChild(pDiv);
       });
