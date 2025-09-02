@@ -1,199 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baked Products Entry</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background-color: #f5f5f5;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 { text-align: center; color: #333; }
-    .product-card {
-      background-color: white;
-      padding: 15px 20px;
-      margin-bottom: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .product-card label { font-weight: bold; font-size: 16px; }
-    .product-card input {
-      width: 60px;
-      padding: 5px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    #submit-btn {
-      display: block;
-      margin: 20px auto;
-      padding: 12px 30px;
-      font-size: 16px;
-      font-weight: bold;
-      color: white;
-      background-color: #1e90ff;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
-    #submit-btn:hover { background-color: #0b72d3; }
-
-    /* 🔄 Loading overlay */
-    #loading {
-      display: none; /* hidden by default */
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.8);
-      z-index: 9999;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-    }
-    .spinner {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #1e90ff;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .loading-text {
-      margin-top: 15px;
-      font-size: 18px;
-      color: #333;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baked Products Entry</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; margin:0; padding:20px;}
+  h1 { text-align:center; color:#333; margin-bottom:20px;}
+  .product-card { background:white; padding:15px 20px; margin-bottom:15px; border-radius:10px;
+    box-shadow:0 4px 6px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; }
+  .product-card label { font-weight:bold; font-size:16px; }
+  .product-card input { width:60px; padding:5px; border-radius:5px; border:1px solid #ccc; text-align:center; }
+  #submit-btn { display:block; margin:20px auto; padding:12px 30px; font-size:16px; font-weight:bold; color:white;
+    background:#1e90ff; border:none; border-radius:10px; cursor:pointer; transition: background 0.2s ease;}
+  #submit-btn:hover { background:#0b72d3; }
+  #loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8);
+    z-index:9999; justify-content:center; align-items:center; flex-direction:column; }
+  .spinner { border:6px solid #f3f3f3; border-top:6px solid #1e90ff; border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; }
+  @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+  .loading-text { margin-top:15px; font-size:18px; color:#333; }
+</style>
 </head>
 <body>
-  <h1>Enter Baked Product Quantities</h1>
-  <div id="product-list"></div>
-  <button id="submit-btn">Submit</button>
+<h1>Enter Baked Product Quantities</h1>
+<div id="product-list"></div>
+<button id="submit-btn">Submit</button>
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading...</div>
+</div>
 
-  <!-- 🔄 Loading Overlay -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <div class="loading-text">Loading...</div>
-  </div>
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
 
-  <script>
-    const tg = window.Telegram.WebApp;
-    tg.ready();
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const gist_url = urlParams.get("gist_url");
-    const GITHUB_TOKEN = urlParams.get("token"); 
+const urlParams = new URLSearchParams(window.location.search);
+const gist_url = urlParams.get("gist_url");
+const GITHUB_TOKEN = urlParams.get("token");
 
-    const loading = document.getElementById("loading");
-    function showLoading(msg="Loading...") {
-      document.querySelector(".loading-text").textContent = msg;
-      loading.style.display = "flex";
+const loading = document.getElementById("loading");
+function showLoading(msg="Loading..."){ document.querySelector(".loading-text").textContent = msg; loading.style.display="flex"; }
+function hideLoading(){ loading.style.display="none"; }
+
+// --- retry fetch function for mobile stability ---
+async function retryFetch(url, options={}, retries=3, timeout=10000){
+  for(let i=0;i<retries;i++){
+    try{
+      const controller = new AbortController();
+      const id = setTimeout(()=>controller.abort(), timeout);
+      const res = await fetch(url, {...options, signal: controller.signal});
+      clearTimeout(id);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }catch(e){
+      if(i===retries-1) throw e;
+      await new Promise(r=>setTimeout(r,2000));
     }
-    function hideLoading() {
-      loading.style.display = "none";
-    }
+  }
+}
 
-    async function loadData() {
-      if (!gist_url) return alert("⚠️ No data source provided.");
-      try {
-        showLoading("Fetching products...");
-        const res = await fetch(gist_url);
-        const data = await res.json();
-        const productList = document.getElementById("product-list");
-        productList.innerHTML = "";
-    
-        if (data.products && data.products.length > 0) {
-          data.products.forEach(product => {
-            const card = document.createElement("div");
-            card.className = "product-card";
-            const label = document.createElement("label");
-            label.textContent = product.productname;
-            const input = document.createElement("input");
-            input.type = "number"; 
-            input.min = 0; 
-            input.placeholder = "";   // 👈 empty placeholder
-            input.dataset.id = product.productid;
-            card.appendChild(label); 
-            card.appendChild(input); 
-            productList.appendChild(card);
-          });
-        } else { 
-          productList.innerHTML = "<p>No products available</p>"; 
-        }
-      } catch(err){
-        alert("⚠️ Failed to load products.");
-        console.error(err);
-      } finally {
-        hideLoading();
-      }
-    }
-    
-    async function createGist(products) {
-      showLoading("Submitting...");
-      const payload = { 
-        files: { 
-          "baked_submission.json": { content: JSON.stringify({ products }, null, 2) } 
-        }, 
-        public: false 
-      };
-      const res = await fetch("https://api.github.com/gists", {
-        method: "POST",
-        headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+async function loadData(){
+  if(!gist_url) return alert("⚠️ No data source provided.");
+  try{
+    showLoading("Fetching products...");
+    const data = await retryFetch(gist_url);
+    const productList = document.getElementById("product-list");
+    productList.innerHTML="";
+    if(data.products && data.products.length>0){
+      data.products.forEach(product=>{
+        const card = document.createElement("div");
+        card.className="product-card";
+        const label = document.createElement("label");
+        label.textContent=product.productname;
+        const input = document.createElement("input");
+        input.type="number"; input.min=0; input.placeholder="";
+        input.dataset.id=product.productid;
+        card.appendChild(label);
+        card.appendChild(input);
+        productList.appendChild(card);
       });
-      if (!res.ok) throw new Error("Failed to create gist");
-      const gist = await res.json();
-      return gist.files["baked_submission.json"].raw_url;
-    }
-    
-    async function deleteGist(originalUrl) {
-      try {
-        const parts = originalUrl.split("/"); 
-        const gistId = parts[parts.indexOf("gists")+1]; 
-        if(!gistId) return;
-        await fetch(`https://api.github.com/gists/${gistId}`, { 
-          method:"DELETE", 
-          headers:{"Authorization":`token ${GITHUB_TOKEN}`} 
-        });
-      } catch (err) { 
-        console.warn("Could not delete original gist:", err); 
-      }
-    }
-    
-    document.getElementById("submit-btn").addEventListener("click", async () => {
-      const products = [];
-      document.querySelectorAll(".product-card input").forEach(input => {
-        const qty = input.value === "" ? 0 : parseInt(input.value); // 👈 treat empty as 0
-        products.push({ productid: input.dataset.id, quantity: qty });
-      });
-      
-      try {
-        const newGistUrl = await createGist(products);
-        if(gist_url) await deleteGist(gist_url);
-        tg.sendData(JSON.stringify({ gist_url: newGistUrl }));
-        tg.close();
-      } catch(err){ 
-        console.error(err); 
-        alert("⚠️ Failed to save data."); 
-      } finally {
-        hideLoading();
-      }
-    });
-    
-    loadData();
-  </script>
-    
+    }else productList.innerHTML="<p>No products available</p>";
+  }catch(err){ alert("⚠️ Failed to load products."); console.error(err); }
+  finally{ hideLoading(); }
+}
+
+async function createGist(products){
+  showLoading("Submitting...");
+  const payload = { files:{ "baked_submission.json":{ content: JSON.stringify({products},null,2) } }, public:false };
+  const data = await retryFetch("https://api.github.com/gists", { method:"POST", headers:{
+    "Authorization":`token ${GITHUB_TOKEN}`, "Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  return data.files["baked_submission.json"].raw_url;
+}
+
+async function deleteGist(originalUrl){
+  try{
+    const parts = originalUrl.split("/"), gistId=parts[parts.indexOf("gists")+1];
+    await retryFetch(`https://api.github.com/gists/${gistId}`, { method:"DELETE", headers:{ "Authorization":`token ${GITHUB_TOKEN}` } });
+  }catch(err){ console.warn("Could not delete original gist:",err); }
+}
+
+document.getElementById("submit-btn").addEventListener("click", async ()=>{
+  const products=[];
+  document.querySelectorAll(".product-card input").forEach(input=>{
+    const qty=input.value===""?0:parseInt(input.value);
+    products.push({ productid: input.dataset.id, quantity: qty });
+  });
+  try{
+    const newGistUrl = await createGist(products);
+    if(gist_url) await deleteGist(gist_url);
+    tg.sendData(JSON.stringify({ gist_url:newGistUrl }));
+    tg.close();
+  }catch(err){ console.error(err); alert("⚠️ Failed to save data."); }
+  finally{ hideLoading(); }
+});
+
+loadData();
+</script>
 </body>
 </html>
